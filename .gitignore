@@ -33,8 +33,6 @@ env/
 node_modules/
 .npm
 .eslintcache
-dist/
-build/
 .next/
 out/
 .nuxt
@@ -51,16 +49,26 @@ out/
 .yarn/install-state.gz
 .pnp.*
 bun.lockb
+dist-ssr
+coverage
+*.local
+*.tsbuildinfo
+*.timestamp-*-*.mjs
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.sw?
 *~
-.DS_Store
 *.sublime-project
 *.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
 # Docker
 docker-compose.override.yml
@@ -79,6 +87,7 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+pnpm-debug.log*
 
 # OS
 .DS_Store
@@ -91,3 +100,10 @@ data/
 uploads/
 temp/
 cache/
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/
