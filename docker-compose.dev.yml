@@ -43,17 +43,13 @@ services:
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
+      BE_APP_MODULE: app.main:app
       REDIS_URL: redis://redis:6379/0
       CHROMA_HOST: chromadb
       CHROMA_PORT: "8000"
       MODEL_BASE_URL: http://model:11434
+      OLLAMA_MODEL: qwen3:32b
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # Local HuggingFace model (leave empty to use Ollama).
-      # On macOS Docker cannot access MPS — run BE outside Docker for local model use.
-      # On Linux with NVIDIA, add `deploy: resources: reservations: devices:` for GPU passthrough.
-      LOCAL_MODEL_PATH: ${LOCAL_MODEL_PATH:-}
-      LOCAL_MODEL_DEVICE: ${LOCAL_MODEL_DEVICE:-auto}
-      LOCAL_MODEL_MAX_NEW_TOKENS: ${LOCAL_MODEL_MAX_NEW_TOKENS:-1024}
     develop:
       watch:
         - action: sync

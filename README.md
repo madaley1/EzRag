@@ -51,6 +51,12 @@ Specification source: README.spec.md
 - `docker-compose.dev.yml` — dev services with file watching/sync
 - `README.spec.md` — project acceptance criteria and roadmap
 
+## Startup Docs
+
+- Primary startup reference: `STARTUP.md`
+- Backend env template: `BE/.env.example`
+- Local-model-ready env used in this workspace: `BE/.env`
+
 ## Prerequisites
 
 - Docker Desktop (with Compose v2, supports `compose develop watch`)
@@ -95,6 +101,21 @@ BE_APP_MODULE=main:app docker compose -f docker-compose.dev.yml up --watch
 3. `source .venv/bin/activate`
 4. `pip install -r requirements.txt`
 5. `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+
+### Local Model Quickstart (HuggingFace)
+
+Use this mode when you want the backend to run a local model directly (instead of
+Ollama/OpenAI). On macOS this is the preferred approach for Apple Silicon MPS.
+
+1. Start dependencies only: `docker compose -f docker-compose.dev.yml up -d chromadb redis`
+2. In `BE/`, install local-model deps: `pip install -r requirements-local-llm.txt`
+3. Edit `BE/.env` and set:
+   - `LOCAL_MODEL_PATH=/absolute/path/to/model`
+   - `LOCAL_MODEL_DEVICE=mps` (Apple Silicon)
+4. Start backend locally: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+5. Start FE locally: `cd FE && bun run dev`
+
+See `STARTUP.md` for the full startup matrix and troubleshooting steps.
 
 ## Startup Sequence
 

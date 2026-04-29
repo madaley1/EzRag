@@ -1,22 +1,17 @@
 """
 EZRag FastAPI application entry point.
 
-Startup sequence (all steps happen concurrently so the server accepts
-requests the moment uvicorn is ready):
+Startup sequence:
 
 1. Uvicorn binds the port — HTTP is immediately available.
-2. lifespan() fires two background tasks via the thread pool:
-   a. _run_ingestion() — recursively walks every RAG_DIRS path, extracts
-      text via Tika, embeds with sentence-transformers, and upserts into
-      ChromaDB.  Progress is tracked in ingestion_status.
-   b. start_model_loading() — if LOCAL_MODEL_PATH is set, loads the
-      HuggingFace model in bf16 and tracks estimated % complete in
-      model_status.  No-op when using Ollama or OpenAI.
+2. lifespan() fires a background task via the thread pool:
+   - _run_ingestion() — recursively walks every RAG_DIRS path, extracts
+     text via Tika, embeds with sentence-transformers, and upserts into
+     ChromaDB.  Progress is tracked in ingestion_status.
 3. start_watching() — watchdog Observer begins monitoring RAG_DIRS for
    file creates/deletes/renames and updates ChromaDB in real time.
 
-Poll GET /status to observe progress.  The WebSocket endpoint (/ws/chat)
-gates queries on model readiness when a local model is configured.
+Poll GET /status to observe progress.
 """
 
 import asyncio
@@ -28,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config
 from .ingest import ingest_directory, list_files, remove_file
-from .query import query, start_model_loading
+from .query import query
 from .status import ingestion_status, model_status
 from .watch import start_watching, stop_watching
 
@@ -49,10 +44,8 @@ async def lifespan(app: FastAPI):
 
     loop = asyncio.get_event_loop()
 
-    # Ingestion and model loading run concurrently in the thread pool —
-    # the server accepts requests immediately while both work in the background.
+    # Ingestion runs in the thread pool — server accepts requests immediately.
     loop.run_in_executor(None, _run_ingestion)
-    start_model_loading()  # no-op when LOCAL_MODEL_PATH is unset
 
     start_watching()
     yield
@@ -118,15 +111,6 @@ async def websocket_chat(websocket: WebSocket):
             data = await websocket.receive_json()
             message = (data.get("message") or "").strip()
             if not message:
-                continue
-
-            # If a local model is configured but hasn't finished loading yet, tell the client.
-            if config.LOCAL_MODEL_PATH and model_status.state == "loading":
-                await websocket.send_json({
-                    "type": "model_loading",
-                    "progress": model_status.progress,
-                    "message": model_status.message,
-                })
                 continue
 
             try:

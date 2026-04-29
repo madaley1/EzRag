@@ -118,11 +118,10 @@ def app_client(mocker):
     """
     FastAPI TestClient with every startup side-effect mocked.
 
-    Ingestion, model loading, and the file watcher are all replaced with no-ops
-    so the test server starts and stops instantly.
+    Ingestion and the file watcher are replaced with no-ops so the test
+    server starts and stops instantly.
     """
     mocker.patch("app.main._run_ingestion")
-    mocker.patch("app.main.start_model_loading")
     mocker.patch("app.main.start_watching")
     mocker.patch("app.main.stop_watching")
 
