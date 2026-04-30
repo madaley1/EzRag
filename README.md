@@ -58,7 +58,6 @@ Specification source: README.spec.md
 - `BE/` — Python backend
 - `data/` — Drop files here for ingestion (mounted at `/data` in BE container)
 - `docker-compose.dev.yml` — dev services with file watching/sync
-- `docker-compose.template.yml` — minimal template for reference
 - `README.spec.md` — project acceptance criteria and roadmap
 
 ## Prerequisites
