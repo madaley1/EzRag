@@ -66,7 +66,7 @@ Specification source: README.spec.md
 - Bun (for local FE workflows if needed)
 - Python 3.11+ (for local BE workflows if needed)
 
-## Development (Docker, Recommended)
+## Development
 
 Start all services with live development sync:
 
@@ -83,31 +83,6 @@ Notes:
 - BE changes in `BE/` sync into the BE container; Uvicorn reload is enabled.
 - Changes to `FE/package.json`, `FE/bun.lock`, or `BE/requirements.txt` trigger service rebuilds.
 - Tika runs as a separate container — no Java needed in the BE image.
-
-## Backend App Module
-
-The backend container starts Uvicorn with `app.main:app`. To override:
-
-```bash
-BE_APP_MODULE=main:app docker compose -f docker-compose.dev.yml up --watch
-```
-
-## Local Development (Without Docker)
-
-### Frontend (local)
-
-1. `cd FE`
-2. `bun install`
-3. `bun run dev`
-
-### Backend (local)
-
-1. `cd BE`
-2. `python -m venv .venv`
-3. `source .venv/bin/activate`
-4. `pip install -r requirements.txt`
-5. Ensure ChromaDB, Redis, Ollama, and Tika are running (e.g. via `docker compose -f docker-compose.dev.yml up -d chromadb redis model tika`)
-6. `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
 ## Startup Sequence
 
@@ -156,32 +131,10 @@ services are required.
 
 ## Planned Milestones
 
-Based on README.spec.md:
-
-1. Initial ingestion
-
-   - Recursively find files from configured directories
-   - Track file paths and metadata
-   - Generate embeddings
-   - Insert vectors into ChromaDB
-
-1. Query workflow
-
-   - Retrieve relevant context from vector DB
-   - Ensure LLM responses cite sources
-   - Return explicit "no info found" when context is missing
-   - Ask user before external web access
-
-1. Directory change handling
-
-   - Monitor source directories for add/delete
-   - Auto-ingest added files
-   - Mark deleted files and expose deletion management in FE
-
 1. Stretch goals
 
    - Store approved web-fetched knowledge in vector DB
-   - Persist conversations for future context
+   - Persist conversations for future context in a way that doesn't compromise reference integrity
 
 ## License
 
