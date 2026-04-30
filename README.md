@@ -39,44 +39,51 @@ Specification source: README.spec.md
 - LangChain
 - Sentence-Transformers
 - ChromaDB
-- OpenAI SDK
+- Ollama (local LLM inference)
 - websockets
 - watchdog
-- Apache Tika
+- Apache Tika (remote service for document extraction)
+
+### Infrastructure
+
+- Docker Compose
+- Ollama (qwen3:1.7b, auto-pulled on first start)
+- ChromaDB 0.4.14 (vector store)
+- Apache Tika (document parsing — PDFs, DOCX, etc.)
+- Redis
 
 ## Repository Layout
 
 - `FE/` — Vue frontend
 - `BE/` — Python backend
+- `data/` — Drop files here for ingestion (mounted at `/data` in BE container)
 - `docker-compose.dev.yml` — dev services with file watching/sync
+- `docker-compose.template.yml` — minimal template for reference
 - `README.spec.md` — project acceptance criteria and roadmap
-
-## Startup Docs
-
-- Primary startup reference: `STARTUP.md`
-- Backend env template: `BE/.env.example`
-- Local-model-ready env used in this workspace: `BE/.env`
 
 ## Prerequisites
 
 - Docker Desktop (with Compose v2, supports `compose develop watch`)
 - Bun (for local FE workflows if needed)
 - Python 3.11+ (for local BE workflows if needed)
-- Java runtime for Tika when that parsing flow is implemented
 
 ## Development (Docker, Recommended)
 
-Start both FE and BE with live development sync:
+Start all services with live development sync:
 
 1. From repo root, run: `docker compose -f docker-compose.dev.yml up --watch`
 2. Frontend is available at: <http://localhost:5173>
-3. Backend is available at: <http://localhost:8000>
+3. Backend API is available at: <http://localhost:8000>
+4. Place files in `./data/` — they are mounted into the BE container at `/data` and ingested automatically.
+
+On first start, the Ollama model (`qwen3:1.7b`) is pulled automatically. Subsequent starts use the cached model from the `ollama_data` volume.
 
 Notes:
 
 - FE changes in `FE/` sync into the FE container and hot-reload.
 - BE changes in `BE/` sync into the BE container; Uvicorn reload is enabled.
 - Changes to `FE/package.json`, `FE/bun.lock`, or `BE/requirements.txt` trigger service rebuilds.
+- Tika runs as a separate container — no Java needed in the BE image.
 
 ## Backend App Module
 
@@ -100,22 +107,8 @@ BE_APP_MODULE=main:app docker compose -f docker-compose.dev.yml up --watch
 2. `python -m venv .venv`
 3. `source .venv/bin/activate`
 4. `pip install -r requirements.txt`
-5. `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-
-### Local Model Quickstart (HuggingFace)
-
-Use this mode when you want the backend to run a local model directly (instead of
-Ollama/OpenAI). On macOS this is the preferred approach for Apple Silicon MPS.
-
-1. Start dependencies only: `docker compose -f docker-compose.dev.yml up -d chromadb redis`
-2. In `BE/`, install local-model deps: `pip install -r requirements-local-llm.txt`
-3. Edit `BE/.env` and set:
-   - `LOCAL_MODEL_PATH=/absolute/path/to/model`
-   - `LOCAL_MODEL_DEVICE=mps` (Apple Silicon)
-4. Start backend locally: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-5. Start FE locally: `cd FE && bun run dev`
-
-See `STARTUP.md` for the full startup matrix and troubleshooting steps.
+5. Ensure ChromaDB, Redis, Ollama, and Tika are running (e.g. via `docker compose -f docker-compose.dev.yml up -d chromadb redis model tika`)
+6. `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
 ## Startup Sequence
 
@@ -128,10 +121,6 @@ uvicorn ready → HTTP available instantly
       ├─ thread: _run_ingestion()
       │    Walk RAG_DIRS → Tika extract → embed → ChromaDB upsert
       │    Updates ingestion_status.files_done / files_total as it goes
-      │
-      ├─ thread: start_model_loading()   (only when LOCAL_MODEL_PATH is set)
-      │    Reads shard sizes → estimates load time → loads model in bf16
-      │    Updates model_status.progress every 0.5 s
       │
       └─ start_watching()
            watchdog Observer on all RAG_DIRS
@@ -146,18 +135,14 @@ Poll `GET /status` (the FE does this automatically every 2 s while loading):
 
 ```json
 {
-  "model":     { "state": "loading", "progress": 0.72, "message": "Loading Qwen3-32B…" },
+  "model":     { "state": "idle", "progress": 0.0, "message": "" },
   "ingestion": { "state": "running", "progress": 0.45, "files_done": 45, "files_total": 100 }
 }
 ```
 
-`model.state` values: `idle` (Ollama/OpenAI in use) | `loading` | `ready` | `error`
+`model.state` values: `idle` | `loading` | `ready` | `error`
 
 `ingestion.state` values: `idle` | `running` | `done`
-
-The chat WebSocket (`/ws/chat`) returns a `model_loading` frame instead of an
-answer while `model.state == "loading"` and `LOCAL_MODEL_PATH` is set. The FE
-disables the input and shows the progress banner automatically.
 
 ### Running tests
 

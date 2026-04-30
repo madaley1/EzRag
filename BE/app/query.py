@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from openai import OpenAI
+import requests
 
 from . import config
 from .ingest import get_collection, get_embedding_model
@@ -14,15 +14,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _api_generate(messages: list) -> str:
-    if config.OPENAI_API_KEY:
-        client = OpenAI(api_key=config.OPENAI_API_KEY)
-        model_name = "gpt-4o-mini"
-    else:
-        client = OpenAI(base_url=f"{config.MODEL_BASE_URL}/v1", api_key="ollama")
-        model_name = config.OLLAMA_MODEL
-
-    response = client.chat.completions.create(model=model_name, messages=messages)
-    return response.choices[0].message.content
+    url = f"{config.MODEL_BASE_URL}/api/chat"
+    payload = {
+        "model": config.OLLAMA_MODEL,
+        "messages": messages,
+        "stream": False,
+    }
+    resp = requests.post(url, json=payload, timeout=120)
+    resp.raise_for_status()
+    return resp.json()["message"]["content"]
 
 
 # ---------------------------------------------------------------------------
