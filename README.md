@@ -6,12 +6,6 @@ EZRag is a local-first RAG app scaffold designed to make it easy to:
 - embed and store them in a vector database,
 - query an LLM with source-backed answers.
 
-This repository currently includes:
-
-- FE: Vue 3 + Vite + Bun
-- BE: Python FastAPI / LangChain / ChromaDB
-- Dev orchestration: Docker Compose with live sync and rebuild watching
-
 ## Current Status
 
 The project is in active development.
@@ -19,8 +13,6 @@ The project is in active development.
 - Frontend app, router, chat view, and file management view are implemented.
 - Backend ingestion, query, and file-watch pipelines are implemented.
 - Development compose file is ready.
-
-Specification source: README.spec.md
 
 ## Tech Stack
 
@@ -47,7 +39,7 @@ Specification source: README.spec.md
 ### Infrastructure
 
 - Docker Compose
-- Ollama (qwen3:1.7b, auto-pulled on first start)
+- Ollama (qwen3:1.7b, auto-pulled on first start, can be changed)
 - ChromaDB 0.4.14 (vector store)
 - Apache Tika (document parsing — PDFs, DOCX, etc.)
 - Redis
