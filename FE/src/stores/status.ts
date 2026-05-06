@@ -26,6 +26,7 @@ export const useStatusStore = defineStore('status', () => {
     files_done: 0,
     files_total: 0,
   })
+  const backendReachable = ref(false)
 
   const isAnythingLoading = computed(
     () => model.value.state === 'loading' || ingestion.value.state === 'running',
@@ -40,8 +41,9 @@ export const useStatusStore = defineStore('status', () => {
       const data = await res.json()
       model.value = data.model
       ingestion.value = data.ingestion
+      backendReachable.value = true
     } catch {
-      // Backend not reachable yet — silently retry
+      backendReachable.value = false
     } finally {
       schedule()
     }
@@ -63,5 +65,5 @@ export const useStatusStore = defineStore('status', () => {
     }
   }
 
-  return { model, ingestion, isAnythingLoading, start, stop }
+  return { model, ingestion, backendReachable, isAnythingLoading, start, stop }
 })

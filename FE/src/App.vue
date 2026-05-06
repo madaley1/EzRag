@@ -66,6 +66,9 @@ onUnmounted(() => status.stop())
     </nav>
 
     <main class="main-content">
+      <div v-if="!status.backendReachable" class="connectivity-banner">
+        Waiting for backend to start…
+      </div>
       <RouterView />
     </main>
   </div>
@@ -201,5 +204,15 @@ body,
   display: flex;
   flex-direction: column;
   background: #fff;
+}
+
+.connectivity-banner {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  border-bottom: 1px solid #fde68a;
 }
 </style>

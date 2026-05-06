@@ -19,10 +19,14 @@ export const useFilesStore = defineStore('files', () => {
     error.value = null
     try {
       const res = await fetch(`${API_URL}/files`)
+      if (!res.ok) {
+        error.value = `Server returned ${res.status} — the backend may still be starting up.`
+        return
+      }
       const data = await res.json()
       files.value = data.files
-    } catch (e) {
-      error.value = String(e)
+    } catch {
+      error.value = 'Unable to reach the backend. It may still be initializing.'
     } finally {
       loading.value = false
     }
@@ -30,10 +34,16 @@ export const useFilesStore = defineStore('files', () => {
 
   async function deleteFile(path: string) {
     try {
-      await fetch(`${API_URL}/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+      const res = await fetch(`${API_URL}/files?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        error.value = `Failed to delete file — server returned ${res.status}.`
+        return
+      }
       files.value = files.value.filter((f) => f.source !== path)
-    } catch (e) {
-      error.value = String(e)
+    } catch {
+      error.value = 'Unable to reach the backend. It may still be initializing.'
     }
   }
 
