@@ -101,6 +101,7 @@ data/
 uploads/
 temp/
 cache/
+docker-compose.local.yml
 
 # Cypress
 /cypress/videos/
