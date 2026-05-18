@@ -10,3 +10,9 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
 QUERY_N_RESULTS = int(os.getenv("QUERY_N_RESULTS", "5"))
+IGNORE_DOTFILES = os.getenv("IGNORE_DOTFILES", "true").lower() in ("1", "true", "yes")
+IGNORE_DIRS = {d.strip() for d in os.getenv("IGNORE_DIRS", "node_modules").split(",") if d.strip()}
+INGEST_EXTENSIONS: set | None = (
+    {e.strip().lower().lstrip(".") for e in os.getenv("INGEST_EXTENSIONS", "").split(",") if e.strip()}
+    or None
+)
