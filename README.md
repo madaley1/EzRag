@@ -49,7 +49,8 @@ The project is in active development.
 - `FE/` — Vue frontend
 - `BE/` — Python backend
 - `data/` — Drop files here for ingestion (mounted at `/data` in BE container)
-- `docker-compose.dev.yml` — dev services with file watching/sync
+- `docker-compose.dev.template.yml` — dev template; copy to `docker-compose.dev.yml` to use (gitignored so personal mounts stay local)
+- `docker-compose.template.yml` — non-dev template (no hot reload, no host bind-mounts, internal-only ports)
 
 ## Prerequisites
 
@@ -61,10 +62,12 @@ The project is in active development.
 
 Start all services with live development sync:
 
-1. From repo root, run: `docker compose -f docker-compose.dev.yml up --watch`
-2. Frontend is available at: <http://localhost:5173>
-3. Backend API is available at: <http://localhost:8000>
-4. Place files in `./data/` — they are mounted into the BE container at `/data` and ingested automatically.
+1. Copy the template: `cp docker-compose.dev.template.yml docker-compose.dev.yml`
+2. (Optional) Add personal RAG source mounts to the `be` service in your new `docker-compose.dev.yml`.
+3. From repo root, run: `docker compose -f docker-compose.dev.yml up --watch`
+4. Frontend is available at: <http://localhost:5173>
+5. Backend API is available at: <http://localhost:8000>
+6. Place files in `./data/` — they are mounted into the BE container at `/data` and ingested automatically.
 
 On first start, the Ollama model (`qwen3:1.7b`) is pulled automatically. Subsequent starts use the cached model from the `ollama_data` volume.
 
@@ -74,6 +77,27 @@ Notes:
 - BE changes in `BE/` sync into the BE container; Uvicorn reload is enabled.
 - Changes to `FE/package.json`, `FE/bun.lock`, or `BE/requirements.txt` trigger service rebuilds.
 - Tika runs as a separate container — no Java needed in the BE image.
+
+## Non Dev Deployment
+
+`docker-compose.template.yml` is a stripped-down version intended as a starting
+point for a real deployment. Compared to the dev file it:
+
+- builds the FE for production (`bun run build && bun run preview`) instead of
+  running the Vite dev server
+- bakes BE source into the image rather than bind-mounting from the host
+- removes Uvicorn `--reload` and the `develop: watch:` blocks
+- removes personal volume mounts (e.g. `~/Documents/obsidian-vault`)
+- keeps ChromaDB, Redis, and Tika ports internal-only (not published to the host)
+- does **not** auto-pull the Ollama model — you pull it once yourself
+
+To use it, copy the template, fill in your `RAG_DIRS` volume mounts, then run:
+
+```bash
+cp docker-compose.template.yml docker-compose.yml
+docker compose up -d
+docker compose exec model ollama pull qwen3:1.7b   # one-time
+```
 
 ## Startup Sequence
 

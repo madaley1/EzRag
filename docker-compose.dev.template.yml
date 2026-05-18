@@ -1,0 +1,135 @@
+# Dev compose template — copy to docker-compose.dev.yml and customise.
+#
+# This file is checked in; docker-compose.dev.yml is gitignored so you can
+# add personal volume mounts (e.g. local knowledge bases) without polluting
+# the repo.
+#
+#   cp docker-compose.dev.template.yml docker-compose.dev.yml
+#   # add your own RAG_DIRS volume mounts on the `be` service
+#   docker compose -f docker-compose.dev.yml up --watch
+
+services:
+  fe:
+    image: imbios/bun-node:latest
+    working_dir: /app
+    command: >
+      sh -lc "bun i && bun run dev --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./FE:/app
+      - /app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      VITE_API_URL: http://localhost:8000
+      VITE_WS_URL: ws://localhost:8000
+    depends_on:
+      - be
+    networks:
+      - app-net
+    develop:
+      watch:
+        - action: sync
+          path: ./FE
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
+            - .git/
+        - action: rebuild
+          path: ./FE/package.json
+
+  be:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -lc "pip install --no-cache-dir -r requirements.txt &&
+      uvicorn ${BE_APP_MODULE:-app.main:app} --reload --reload-dir /app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./BE:/app
+      - ./data:/data
+      # Add personal RAG source mounts here, e.g.:
+      # - ~/Documents/my-notes:/data/my-notes
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      BE_APP_MODULE: app.main:app
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      MODEL_BASE_URL: http://model:11434
+      OLLAMA_MODEL: qwen3:1.7b
+      TIKA_SERVER_ENDPOINT: http://tika:9998
+      TIKA_CLIENT_ONLY: "True"
+    develop:
+      watch:
+        - action: sync
+          path: ./BE
+          target: /app
+          ignore:
+            - __pycache__/
+            - .venv/
+            - "*.pyc"
+        - action: rebuild
+          path: ./BE/requirements.txt
+    depends_on:
+      - chromadb
+      - redis
+      - model
+      - tika
+    networks:
+      - app-net
+
+  tika:
+    image: apache/tika:latest
+    ports:
+      - "9998:9998"
+    networks:
+      - app-net
+
+  model:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_KEEP_ALIVE: "30m"
+      OLLAMA_MODEL: qwen3:1.7b
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull $${OLLAMA_MODEL} && wait"]
+    networks:
+      - app-net
+
+  chromadb:
+    image: chromadb/chroma:0.4.14
+    ports:
+      - "8001:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ALLOW_RESET: "TRUE"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - app-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-net
+
+volumes:
+  ollama_data:
+  chroma_data:
+  redis_data:
+
+networks:
+  app-net:
+    driver: bridge

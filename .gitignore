@@ -73,6 +73,7 @@ coverage
 
 # Docker
 docker-compose.override.yml
+docker-compose.dev.yml
 .docker/
 
 # ChromaDB / Vector DB
