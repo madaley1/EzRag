@@ -12,6 +12,23 @@ from .status import ingestion_status
 
 logger = logging.getLogger(__name__)
 
+
+def _is_dotpath(path: str) -> bool:
+    """Return True if any component of path starts with a dot."""
+    return any(part.startswith(".") for part in Path(path).parts)
+
+
+def _should_skip(file_path: Path, base: Path | None = None) -> bool:
+    """Return True if the file should be excluded from ingestion."""
+    parts = file_path.relative_to(base).parts if base else file_path.parts
+    if config.IGNORE_DOTFILES and any(p.startswith(".") for p in parts):
+        return True
+    if config.IGNORE_DIRS and any(p in config.IGNORE_DIRS for p in parts):
+        return True
+    if config.INGEST_EXTENSIONS and file_path.suffix.lower().lstrip(".") not in config.INGEST_EXTENSIONS:
+        return True
+    return False
+
 _embedding_model: Optional[SentenceTransformer] = None
 
 
@@ -100,7 +117,10 @@ def ingest_directory(directory: str) -> int:
         return 0
 
     # Pre-scan so the status total is known before processing begins.
-    all_files = [f for f in path.rglob("*") if f.is_file()]
+    all_files = [
+        f for f in path.rglob("*")
+        if f.is_file() and not _should_skip(f, base=path)
+    ]
     ingestion_status.files_total += len(all_files)
 
     collection = get_collection()
@@ -151,6 +171,8 @@ def list_files(collection=None) -> list:
     seen: dict = {}
     for meta in results.get("metadatas") or []:
         source = meta["source"]
+        if _should_skip(Path(source)):
+            continue
         if source not in seen:
             seen[source] = {
                 "source": source,
