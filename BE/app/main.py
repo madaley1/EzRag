@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config
 from .ingest import ingest_directory, list_files, remove_file
-from .query import query
+from .query import query, retrieve
 from .status import ingestion_status, model_status
 from .watch import start_watching, stop_watching
 
@@ -86,6 +86,16 @@ async def delete_file(path: str):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, lambda: remove_file(path))
     return {"status": "deleted", "path": path}
+
+
+@app.post("/retrieve")
+async def retrieve_chunks(body: dict):
+    question = (body.get("query") or "").strip()
+    if not question:
+        return {"chunks": []}
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, lambda: retrieve(question))
+    return result
 
 
 @app.post("/ingest")

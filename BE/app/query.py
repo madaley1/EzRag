@@ -30,6 +30,51 @@ def _api_generate(messages: list) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Retrieve (used by MCP server and /retrieve endpoint)
+# ---------------------------------------------------------------------------
+
+def retrieve(question: str) -> dict:
+    """Return raw chunks from ChromaDB without calling the LLM.
+    Used by the MCP server so Claude can answer from the retrieved context itself.
+    """
+    collection = get_collection()
+    embed_model = get_embedding_model()
+
+    q_embedding = embed_model.encode(question).tolist()
+
+    try:
+        total = collection.count()
+        n = min(config.QUERY_N_RESULTS, total) if total > 0 else 0
+        results = collection.query(
+            query_embeddings=[q_embedding],
+            n_results=n,
+            where={"deleted": 0},
+            include=["documents", "metadatas", "distances"],
+        ) if n > 0 else {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+    except Exception as e:
+        logger.error(f"ChromaDB retrieve error: {e}")
+        results = {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+
+    docs = (results.get("documents") or [[]])[0]
+    metas = (results.get("metadatas") or [[]])[0]
+    distances = (results.get("distances") or [[]])[0]
+
+    chunks = []
+    for doc, meta, dist in zip(docs, metas, distances):
+        if meta.get("deleted", 0):
+            continue
+        chunks.append({
+            "text": doc,
+            "source": meta["source"],
+            "filename": meta["filename"],
+            "chunk_index": meta.get("chunk_index", 0),
+            "score": round(1 - dist, 4),
+        })
+
+    return {"chunks": chunks}
+
+
+# ---------------------------------------------------------------------------
 # Context building with distance-based relevance
 # ---------------------------------------------------------------------------
 

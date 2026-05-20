@@ -48,6 +48,7 @@ The project is in active development.
 
 - `FE/` — Vue frontend
 - `BE/` — Python backend
+- `mcp/` — MCP server exposing semantic search as a Claude Code tool
 - `data/` — Drop files here for ingestion (mounted at `/data` in BE container)
 - `docker-compose.dev.template.yml` — dev template; copy to `docker-compose.dev.yml` to use (gitignored so personal mounts stay local)
 - `docker-compose.template.yml` — non-dev template (no hot reload, no host bind-mounts, internal-only ports)
@@ -58,9 +59,23 @@ The project is in active development.
 - Bun (for local FE workflows if needed)
 - Python 3.11+ (for local BE workflows if needed)
 
+## Running (pre-built)
+
+For users who just want to run EzRag without modifying the source:
+
+```bash
+docker compose up
+```
+
+- Frontend: <http://localhost:80>
+- Backend API: <http://localhost:8000>
+- Drop files in `./data/` to ingest them.
+
+On first start, images are built and the Ollama model is pulled automatically. Subsequent starts are fast.
+
 ## Development
 
-Start all services with live development sync:
+### Setup
 
 1. Copy the template: `cp docker-compose.dev.template.yml docker-compose.dev.yml`
 2. (Optional) Add personal RAG source mounts to the `be` service in your new `docker-compose.dev.yml`.
@@ -69,7 +84,32 @@ Start all services with live development sync:
 5. Backend API is available at: <http://localhost:8000>
 6. Place files in `./data/` — they are mounted into the BE container at `/data` and ingested automatically.
 
-On first start, the Ollama model (`qwen3:1.7b`) is pulled automatically. Subsequent starts use the cached model from the `ollama_data` volume.
+```bash
+cp docker-compose.dev.example.yml docker-compose.dev.yml
+```
+
+Then create `docker-compose.local.yml` (gitignored) to mount extra directories or override env vars without touching tracked files:
+
+```yaml
+# docker-compose.local.yml
+services:
+  be:
+    volumes:
+      - /absolute/path/to/your/notes:/notes:ro
+    environment:
+      RAG_DIRS: /data,/notes
+```
+
+### Starting services
+
+```bash
+docker compose -f docker-compose.dev.yml -f docker-compose.local.yml up --watch
+```
+
+Omit `-f docker-compose.local.yml` if you have not created that file.
+
+- Frontend: <http://localhost:5173>
+- Backend API: <http://localhost:8000>
 
 Notes:
 
