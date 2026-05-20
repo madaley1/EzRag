@@ -12,11 +12,6 @@ from .web_search import search_web, format_web_context
 
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Inference helpers
-# ---------------------------------------------------------------------------
-
 def _api_generate(messages: list) -> str:
     url = f"{config.MODEL_BASE_URL}/api/chat"
     payload = {
@@ -28,15 +23,7 @@ def _api_generate(messages: list) -> str:
     resp.raise_for_status()
     return resp.json()["message"]["content"]
 
-
-# ---------------------------------------------------------------------------
-# Retrieve (used by MCP server and /retrieve endpoint)
-# ---------------------------------------------------------------------------
-
 def retrieve(question: str) -> dict:
-    """Return raw chunks from ChromaDB without calling the LLM.
-    Used by the MCP server so Claude can answer from the retrieved context itself.
-    """
     collection = get_collection()
     embed_model = get_embedding_model()
 
@@ -73,13 +60,7 @@ def retrieve(question: str) -> dict:
 
     return {"chunks": chunks}
 
-
-# ---------------------------------------------------------------------------
-# Context building with distance-based relevance
-# ---------------------------------------------------------------------------
-
 def _build_context_with_distances(results: dict) -> tuple:
-    """Separate results into strong and weak matches based on distance thresholds."""
     docs = (results.get("documents") or [[]])[0]
     metas = (results.get("metadatas") or [[]])[0]
     distances = (results.get("distances") or [[]])[0]
@@ -113,13 +94,7 @@ def _build_context_with_distances(results: dict) -> tuple:
     weak_ctx = "\n\n---\n\n".join(weak_parts)
     return strong_ctx, weak_ctx, strong_sources, weak_sources
 
-
-# ---------------------------------------------------------------------------
-# Storage: write generated notes
-# ---------------------------------------------------------------------------
-
 def _write_note(question: str, answer: str, sources: list[dict]) -> str | None:
-    """Write a summary note to STORAGE_DIR. Returns the file path or None on failure."""
     try:
         out_dir = Path(config.STORAGE_DIR)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -152,11 +127,6 @@ def _write_note(question: str, answer: str, sources: list[dict]) -> str | None:
         logger.error(f"Failed to write note: {e}")
         return None
 
-
-# ---------------------------------------------------------------------------
-# System prompt construction
-# ---------------------------------------------------------------------------
-
 def _build_system_prompt(
     rigidity: str,
     strong_ctx: str,
@@ -164,14 +134,11 @@ def _build_system_prompt(
     web_ctx: str | None,
     connectivity: bool,
 ) -> str:
-    """Build the system prompt dynamically based on settings."""
 
-    # Determine what context is available
     has_strong = bool(strong_ctx)
     has_weak = bool(weak_ctx)
     has_web = bool(web_ctx)
 
-    # --- Strict mode: only strong matches, refuse otherwise ---
     if rigidity == "strict":
         if has_strong:
             context_block = strong_ctx
@@ -193,7 +160,6 @@ def _build_system_prompt(
                 "relevant information was found in the knowledge base."
             )
 
-    # --- Suggestive mode: strong matches answer, weak matches become suggestions ---
     if rigidity == "suggestive":
         if has_strong:
             context_block = strong_ctx
@@ -234,8 +200,6 @@ def _build_system_prompt(
                 "relevant information was found."
             )
 
-    # --- Weak mode: use all context, allow inference ---
-    # rigidity == "weak"
     local_parts = []
     if has_strong:
         local_parts.append(strong_ctx)
@@ -268,13 +232,7 @@ def _build_system_prompt(
             "but clearly state that this is from general knowledge, not from their documents."
         )
 
-
-# ---------------------------------------------------------------------------
-# Public query function
-# ---------------------------------------------------------------------------
-
 def query(question: str, settings: dict | None = None) -> dict:
-    """Execute a RAG query with the given settings."""
     s = settings or {}
     rigidity = s.get("rigidity") or config.RIGIDITY
     connectivity = s.get("connectivity") if s.get("connectivity") is not None else config.CONNECTIVITY
@@ -300,7 +258,6 @@ def query(question: str, settings: dict | None = None) -> dict:
 
     strong_ctx, weak_ctx, strong_sources, weak_sources = _build_context_with_distances(results)
 
-    # Web search if connectivity enabled
     web_ctx = None
     web_sources = []
     if connectivity:
@@ -308,10 +265,8 @@ def query(question: str, settings: dict | None = None) -> dict:
         web_ctx = format_web_context(web_results)
         web_sources = [{"source": r["url"], "filename": r["title"]} for r in web_results]
 
-    # Build system prompt based on rigidity mode
     system_msg = _build_system_prompt(rigidity, strong_ctx, weak_ctx, web_ctx, connectivity)
 
-    # Determine which local sources to report
     if rigidity == "strict":
         local_sources = strong_sources
     elif rigidity == "suggestive":
@@ -329,7 +284,6 @@ def query(question: str, settings: dict | None = None) -> dict:
 
     result = {"answer": answer, "sources": all_sources}
 
-    # Storage: write note if enabled
     if storage:
         note_path = _write_note(question, answer, all_sources)
         if note_path:

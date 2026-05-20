@@ -17,13 +17,11 @@ INGEST_EXTENSIONS: set | None = (
     or None
 )
 
-# Query settings
-RIGIDITY = os.getenv("RIGIDITY", "strict")  # strict | suggestive | weak
+RIGIDITY = os.getenv("RIGIDITY", "strict")
 CONNECTIVITY = os.getenv("CONNECTIVITY", "false").lower() in ("1", "true", "yes")
 STORAGE = os.getenv("STORAGE", "false").lower() in ("1", "true", "yes")
 STORAGE_DIR = os.getenv("STORAGE_DIR", "/data/generated")
 DISTANCE_THRESHOLD_STRONG = float(os.getenv("DISTANCE_THRESHOLD_STRONG", "1.0"))
 DISTANCE_THRESHOLD_WEAK = float(os.getenv("DISTANCE_THRESHOLD_WEAK", "1.5"))
 
-# Web search
 SEARXNG_URL = os.getenv("SEARXNG_URL", "http://searxng:8080")

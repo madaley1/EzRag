@@ -96,7 +96,6 @@ onMounted(() => store.fetchFiles())
 h2 { margin: 0; font-size: 1.25rem; color: #1e293b; }
 h3 { font-size: 1rem; color: #475569; margin: 1.5rem 0 0.5rem; }
 
-/* Ingestion banner */
 .ingest-banner {
   margin-bottom: 1rem;
   padding: 0.6rem 0.75rem;

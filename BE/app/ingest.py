@@ -14,12 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def _is_dotpath(path: str) -> bool:
-    """Return True if any component of path starts with a dot."""
     return any(part.startswith(".") for part in Path(path).parts)
 
 
 def _should_skip(file_path: Path, base: Path | None = None) -> bool:
-    """Return True if the file should be excluded from ingestion."""
     parts = file_path.relative_to(base).parts if base else file_path.parts
     if config.IGNORE_DOTFILES and any(p.startswith(".") for p in parts):
         return True
@@ -55,7 +53,6 @@ def get_collection(client=None):
 
 
 def extract_text(file_path: str) -> Optional[str]:
-    """Extract text via Tika with a plain-text fallback."""
     try:
         from tika import parser as tika_parser
         parsed = tika_parser.from_file(file_path)
@@ -116,7 +113,6 @@ def ingest_directory(directory: str) -> int:
         logger.warning(f"RAG directory not found: {directory}")
         return 0
 
-    # Pre-scan so the status total is known before processing begins.
     all_files = [
         f for f in path.rglob("*")
         if f.is_file() and not _should_skip(f, base=path)

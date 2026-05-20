@@ -158,7 +158,6 @@ body,
   color: #fff;
 }
 
-/* Status footer */
 .status-footer {
   margin-top: auto;
   display: flex;

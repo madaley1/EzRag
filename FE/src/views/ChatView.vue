@@ -44,7 +44,6 @@ function setRigidity(val: Rigidity) {
 
 <template>
   <div class="chat-view">
-    <!-- Model loading banner -->
     <div v-if="modelBlocked" class="loading-banner">
       <div class="banner-text">
         <span>Loading model… {{ modelProgressPct }}%</span>
@@ -88,7 +87,6 @@ function setRigidity(val: Rigidity) {
       </div>
     </div>
 
-    <!-- Settings drawer -->
     <transition name="drawer">
       <div v-if="drawerOpen" class="settings-drawer">
         <div class="drawer-header">
@@ -182,7 +180,6 @@ function setRigidity(val: Rigidity) {
   position: relative;
 }
 
-/* Model loading banner */
 .loading-banner {
   padding: 0.6rem 1rem;
   background: #fffbeb;
@@ -229,7 +226,6 @@ function setRigidity(val: Rigidity) {
   color: #991b1b;
 }
 
-/* Messages */
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -313,7 +309,6 @@ function setRigidity(val: Rigidity) {
   margin-top: 0.15rem;
 }
 
-/* Settings drawer */
 .settings-drawer {
   position: absolute;
   bottom: 5rem;
@@ -413,7 +408,6 @@ function setRigidity(val: Rigidity) {
   color: #60a5fa;
 }
 
-/* Tooltips */
 .tooltip-wrap {
   position: relative;
   display: inline-flex;
@@ -466,7 +460,6 @@ function setRigidity(val: Rigidity) {
   display: block;
 }
 
-/* Drawer transition */
 .drawer-enter-active, .drawer-leave-active {
   transition: opacity 0.2s, transform 0.2s;
 }
@@ -475,7 +468,6 @@ function setRigidity(val: Rigidity) {
   transform: translateY(8px);
 }
 
-/* Input bar */
 .input-bar {
   padding: 1rem;
   border-top: 1px solid #e2e8f0;

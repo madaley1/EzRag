@@ -1,19 +1,3 @@
-"""
-EZRag FastAPI application entry point.
-
-Startup sequence:
-
-1. Uvicorn binds the port — HTTP is immediately available.
-2. lifespan() fires a background task via the thread pool:
-   - _run_ingestion() — recursively walks every RAG_DIRS path, extracts
-     text via Tika, embeds with sentence-transformers, and upserts into
-     ChromaDB.  Progress is tracked in ingestion_status.
-3. start_watching() — watchdog Observer begins monitoring RAG_DIRS for
-   file creates/deletes/renames and updates ChromaDB in real time.
-
-Poll GET /status to observe progress.
-"""
-
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -43,8 +27,6 @@ async def lifespan(app: FastAPI):
     logger.info("EZRag starting up")
 
     loop = asyncio.get_event_loop()
-
-    # Ingestion runs in the thread pool — server accepts requests immediately.
     loop.run_in_executor(None, _run_ingestion)
 
     start_watching()

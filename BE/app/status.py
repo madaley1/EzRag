@@ -1,10 +1,7 @@
-"""Shared in-process status state. Written by background threads, read by /status endpoint."""
-
-
 class ModelStatus:
     def __init__(self):
-        self.state: str = "idle"   # idle | loading | ready | error
-        self.progress: float = 0.0  # 0.0–1.0
+        self.state: str = "idle"
+        self.progress: float = 0.0
         self.message: str = ""
 
     def as_dict(self) -> dict:
@@ -17,7 +14,7 @@ class ModelStatus:
 
 class IngestionStatus:
     def __init__(self):
-        self.state: str = "idle"   # idle | running | done
+        self.state: str = "idle"
         self.files_done: int = 0
         self.files_total: int = 0
 

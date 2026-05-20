@@ -1,16 +1,3 @@
-"""
-Filesystem watcher for RAG source directories.
-
-RagFileHandler translates watchdog filesystem events into ChromaDB operations:
-  - File created  → ingest_file()   (embed and upsert into ChromaDB)
-  - File deleted  → mark_deleted()  (sets deleted=1 in ChromaDB metadata)
-  - File moved    → mark_deleted() old path + ingest_file() new path
-
-start_watching() is called once during lifespan startup.  It schedules one
-watchdog Observer across all configured RAG_DIRS.  Directories that don't
-exist yet are silently skipped.  stop_watching() is called on shutdown.
-"""
-
 import logging
 from pathlib import Path
 
@@ -26,7 +13,6 @@ _observer = None
 
 
 def _should_skip(path: str) -> bool:
-    """Return True if the path should be excluded based on config."""
     p = Path(path)
     if config.IGNORE_DOTFILES and any(part.startswith(".") for part in p.parts):
         return True

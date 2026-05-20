@@ -1,11 +1,3 @@
-"""
-EzRag MCP server — exposes semantic document search as a tool.
-
-Requires EzRag to be running (docker compose ... up).
-Returns raw chunks from ChromaDB for the caller to answer from directly,
-bypassing the local Ollama model.
-"""
-
 import os
 
 import httpx

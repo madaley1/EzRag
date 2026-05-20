@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def search_web(query: str, max_results: int = 5) -> list[dict]:
-    """Query SearXNG and return a list of {title, url, content} dicts."""
     try:
         resp = requests.get(
             f"{config.SEARXNG_URL}/search",
@@ -33,7 +32,6 @@ def search_web(query: str, max_results: int = 5) -> list[dict]:
 
 
 def format_web_context(results: list[dict]) -> Optional[str]:
-    """Format web search results into a context string for the LLM."""
     if not results:
         return None
     parts = []
