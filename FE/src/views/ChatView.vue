@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
-import { useChatStore, type Rigidity } from '../stores/chat'
+import { useChatStore } from '../stores/chat'
 import { useStatusStore } from '../stores/status'
 
 const chat = useChatStore()
@@ -35,10 +35,6 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault()
     submit()
   }
-}
-
-function setRigidity(val: Rigidity) {
-  chat.settings.rigidity = val
 }
 </script>
 
@@ -102,32 +98,11 @@ function setRigidity(val: Rigidity) {
               <span class="tooltip-text">Controls how strictly answers must match your documents. Strict only uses strong matches; Suggestive offers nearby topics; Weak allows inference beyond your docs.</span>
             </span>
           </label>
-          <div class="rigidity-toggle">
-            <button
-              class="rigidity-btn"
-              :class="{ active: chat.settings.rigidity === 'strict' }"
-              @click="setRigidity('strict')"
-            >
-              <span class="btn-label">Strict</span>
-              <span class="btn-hint">Exact matches only — refuses if nothing found</span>
-            </button>
-            <button
-              class="rigidity-btn"
-              :class="{ active: chat.settings.rigidity === 'suggestive' }"
-              @click="setRigidity('suggestive')"
-            >
-              <span class="btn-label">Suggestive</span>
-              <span class="btn-hint">Suggests related topics when no strong match</span>
-            </button>
-            <button
-              class="rigidity-btn"
-              :class="{ active: chat.settings.rigidity === 'weak' }"
-              @click="setRigidity('weak')"
-            >
-              <span class="btn-label">Weak</span>
-              <span class="btn-hint">Allows inference and extrapolation from context</span>
-            </button>
-          </div>
+          <select v-model="chat.settings.rigidity" class="setting-select">
+            <option value="strict">Strict</option>
+            <option value="suggestive">Suggestive</option>
+            <option value="weak">Weak</option>
+          </select>
         </div>
 
         <div class="setting-group">
@@ -314,6 +289,8 @@ function setRigidity(val: Rigidity) {
   bottom: 5rem;
   right: 1rem;
   width: 280px;
+  max-width: calc(100vw - 2rem);
+  overflow: visible;
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -357,55 +334,20 @@ function setRigidity(val: Rigidity) {
 
 
 
-.rigidity-toggle {
-  display: flex;
-  gap: 2px;
-  background: #f1f5f9;
-  border-radius: 8px;
-  padding: 2px;
+.setting-select {
+  width: 100%;
   margin-top: 0.3rem;
-}
-
-.rigidity-btn {
-  padding: 0.4rem 0.5rem;
-  border: none;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
-  background: transparent;
-  color: #64748b;
-  font-size: 0.75rem;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-  flex: 1;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-}
-
-.rigidity-btn:hover { color: #334155; }
-
-.rigidity-btn.active {
+  font-size: 0.8rem;
+  color: #334155;
   background: #fff;
-  color: #2563eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  outline: none;
 }
 
-.btn-label {
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.btn-hint {
-  font-size: 0.62rem;
-  font-weight: 400;
-  color: #94a3b8;
-  line-height: 1.2;
-}
-
-.rigidity-btn.active .btn-hint {
-  color: #60a5fa;
+.setting-select:focus {
+  border-color: #2563eb;
 }
 
 .tooltip-wrap {
@@ -432,8 +374,8 @@ function setRigidity(val: Rigidity) {
   display: none;
   position: absolute;
   bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
+  transform: none;
   width: 200px;
   padding: 0.5rem 0.6rem;
   background: #1e293b;
@@ -443,15 +385,14 @@ function setRigidity(val: Rigidity) {
   line-height: 1.4;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 20;
+  z-index: 9999;
 }
 
 .tooltip-text::after {
   content: '';
   position: absolute;
   top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 3px;
   border: 5px solid transparent;
   border-top-color: #1e293b;
 }
