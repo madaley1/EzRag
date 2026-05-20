@@ -123,12 +123,17 @@ async def websocket_chat(websocket: WebSocket):
             if not message:
                 continue
 
+            settings = data.get("settings") or {}
+
             try:
-                result = await loop.run_in_executor(None, lambda: query(message))
+                result = await loop.run_in_executor(
+                    None, lambda: query(message, settings=settings)
+                )
                 await websocket.send_json({
                     "type": "answer",
                     "content": result["answer"],
                     "sources": result["sources"],
+                    "stored": result.get("stored"),
                 })
             except Exception as e:
                 logger.error(f"Query error: {e}")

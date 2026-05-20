@@ -1,5 +1,13 @@
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { defineStore } from 'pinia'
+
+export type Rigidity = 'strict' | 'suggestive' | 'weak'
+
+export interface QuerySettings {
+  rigidity: Rigidity
+  connectivity: boolean
+  storage: boolean
+}
 
 export interface Source {
   source: string
@@ -10,6 +18,7 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   sources?: Source[]
+  stored?: string | null
   error?: boolean
 }
 
@@ -19,6 +28,11 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const pending = ref(false)
   const connected = ref(false)
+  const settings = reactive<QuerySettings>({
+    rigidity: 'suggestive',
+    connectivity: false,
+    storage: false,
+  })
 
   let socket: WebSocket | null = null
 
@@ -34,7 +48,6 @@ export const useChatStore = defineStore('chat', () => {
     socket.onclose = () => {
       connected.value = false
       socket = null
-      // Reconnect after 3 s
       setTimeout(connect, 3000)
     }
 
@@ -50,6 +63,7 @@ export const useChatStore = defineStore('chat', () => {
           role: 'assistant',
           content: data.content,
           sources: data.sources ?? [],
+          stored: data.stored ?? null,
         })
       } else if (data.type === 'error') {
         messages.value.push({
@@ -66,16 +80,21 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push({ role: 'user', content: text })
     pending.value = true
 
+    const payload = JSON.stringify({
+      message: text,
+      settings: { ...settings },
+    })
+
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       connect()
       const wait = setInterval(() => {
         if (socket?.readyState === WebSocket.OPEN) {
           clearInterval(wait)
-          socket.send(JSON.stringify({ message: text }))
+          socket.send(payload)
         }
       }, 100)
     } else {
-      socket.send(JSON.stringify({ message: text }))
+      socket.send(payload)
     }
   }
 
@@ -83,5 +102,5 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = []
   }
 
-  return { messages, pending, connected, connect, send, clear }
+  return { messages, pending, connected, settings, connect, send, clear }
 })

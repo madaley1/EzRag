@@ -1,10 +1,14 @@
 import logging
+import re
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import requests
 
 from . import config
 from .ingest import get_collection, get_embedding_model
+from .web_search import search_web, format_web_context
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +30,7 @@ def _api_generate(messages: list) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Public functions
+# Retrieve (used by MCP server and /retrieve endpoint)
 # ---------------------------------------------------------------------------
 
 def retrieve(question: str) -> dict:
@@ -70,28 +74,212 @@ def retrieve(question: str) -> dict:
     return {"chunks": chunks}
 
 
-def _build_context(results: dict) -> tuple:
+# ---------------------------------------------------------------------------
+# Context building with distance-based relevance
+# ---------------------------------------------------------------------------
+
+def _build_context_with_distances(results: dict) -> tuple:
+    """Separate results into strong and weak matches based on distance thresholds."""
     docs = (results.get("documents") or [[]])[0]
     metas = (results.get("metadatas") or [[]])[0]
+    distances = (results.get("distances") or [[]])[0]
 
-    sources = []
-    context_parts = []
-    seen_sources: set = set()
+    strong_parts = []
+    weak_parts = []
+    strong_sources = []
+    weak_sources = []
+    seen_strong: set = set()
+    seen_weak: set = set()
 
-    for doc, meta in zip(docs, metas):
+    for doc, meta, dist in zip(docs, metas, distances):
         if meta.get("deleted", 0):
             continue
         source = meta["source"]
         filename = meta["filename"]
-        context_parts.append(f"[Source: {filename} | {source}]\n{doc}")
-        if source not in seen_sources:
-            seen_sources.add(source)
-            sources.append({"source": source, "filename": filename})
+        entry = f"[Source: {filename}]\n{doc}"
 
-    return "\n\n---\n\n".join(context_parts), sources
+        if dist <= config.DISTANCE_THRESHOLD_STRONG:
+            strong_parts.append(entry)
+            if source not in seen_strong:
+                seen_strong.add(source)
+                strong_sources.append({"source": source, "filename": filename})
+        elif dist <= config.DISTANCE_THRESHOLD_WEAK:
+            weak_parts.append(entry)
+            if source not in seen_weak:
+                seen_weak.add(source)
+                weak_sources.append({"source": source, "filename": filename})
+
+    strong_ctx = "\n\n---\n\n".join(strong_parts)
+    weak_ctx = "\n\n---\n\n".join(weak_parts)
+    return strong_ctx, weak_ctx, strong_sources, weak_sources
 
 
-def query(question: str) -> dict:
+# ---------------------------------------------------------------------------
+# Storage: write generated notes
+# ---------------------------------------------------------------------------
+
+def _write_note(question: str, answer: str, sources: list[dict]) -> str | None:
+    """Write a summary note to STORAGE_DIR. Returns the file path or None on failure."""
+    try:
+        out_dir = Path(config.STORAGE_DIR)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        slug = re.sub(r"[^\w\s-]", "", question[:50]).strip().replace(" ", "_").lower()
+        filename = f"{timestamp}_{slug}.md"
+        filepath = out_dir / filename
+
+        source_list = "\n".join(
+            f"- [{s['filename']}]({s['source']})" for s in sources
+        )
+
+        content = (
+            f"---\n"
+            f"generated: true\n"
+            f"date: {datetime.now().isoformat()}\n"
+            f"question: \"{question}\"\n"
+            f"---\n\n"
+            f"# {question}\n\n"
+            f"{answer}\n\n"
+            f"## Sources\n\n"
+            f"{source_list}\n"
+        )
+
+        filepath.write_text(content, encoding="utf-8")
+        logger.info(f"Stored note: {filepath}")
+        return str(filepath)
+    except Exception as e:
+        logger.error(f"Failed to write note: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# System prompt construction
+# ---------------------------------------------------------------------------
+
+def _build_system_prompt(
+    rigidity: str,
+    strong_ctx: str,
+    weak_ctx: str,
+    web_ctx: str | None,
+    connectivity: bool,
+) -> str:
+    """Build the system prompt dynamically based on settings."""
+
+    # Determine what context is available
+    has_strong = bool(strong_ctx)
+    has_weak = bool(weak_ctx)
+    has_web = bool(web_ctx)
+
+    # --- Strict mode: only strong matches, refuse otherwise ---
+    if rigidity == "strict":
+        if has_strong:
+            context_block = strong_ctx
+            if connectivity and has_web:
+                context_block += f"\n\n===\n\nWeb search results:\n{web_ctx}"
+            return (
+                "You are a helpful assistant with access to a curated knowledge base. "
+                "Answer the user's question using only the provided context. "
+                "Always cite your sources by referencing the filename(s). "
+                "If a source is only tangentially related (shares a keyword but is about "
+                "a different topic), acknowledge it as a weak match rather than presenting "
+                "it as the answer. Do not invent information beyond what the sources provide."
+                f"\n\nContext:\n{context_block}"
+            )
+        else:
+            return (
+                "You are a helpful assistant. The knowledge base does not contain any "
+                "relevant information about this topic. Tell the user clearly that no "
+                "relevant information was found in the knowledge base."
+            )
+
+    # --- Suggestive mode: strong matches answer, weak matches become suggestions ---
+    if rigidity == "suggestive":
+        if has_strong:
+            context_block = strong_ctx
+            if connectivity and has_web:
+                context_block += f"\n\n===\n\nWeb search results:\n{web_ctx}"
+            return (
+                "You are a helpful assistant with access to a curated knowledge base. "
+                "Answer the user's question using the provided context. "
+                "Always cite your sources by referencing the filename(s). "
+                "Do not invent information beyond what the sources provide."
+                f"\n\nContext:\n{context_block}"
+            )
+        elif has_weak:
+            context_block = weak_ctx
+            if connectivity and has_web:
+                context_block += f"\n\n===\n\nWeb search results:\n{web_ctx}"
+            return (
+                "You are a helpful assistant with access to a curated knowledge base. "
+                "The search returned some results, but they are only loosely related to "
+                "the user's question. Present them as suggestions — say something like: "
+                "\"I couldn't find much information on your request, but here's the "
+                "closest thing I could find.\" Do NOT present these as direct answers. "
+                "Briefly describe what each source contains and why it might be tangentially "
+                "relevant. Do not invent information."
+                f"\n\nPartially related context:\n{context_block}"
+            )
+        elif connectivity and has_web:
+            return (
+                "You are a helpful assistant. The local knowledge base did not contain "
+                "relevant information, but web search results are available. "
+                "Answer using the web results and cite URLs. Stay factual."
+                f"\n\nWeb search results:\n{web_ctx}"
+            )
+        else:
+            return (
+                "You are a helpful assistant. The knowledge base does not contain any "
+                "relevant information about this topic. Tell the user clearly that no "
+                "relevant information was found."
+            )
+
+    # --- Weak mode: use all context, allow inference ---
+    # rigidity == "weak"
+    local_parts = []
+    if has_strong:
+        local_parts.append(strong_ctx)
+    if has_weak:
+        local_parts.append(weak_ctx)
+    local_ctx = "\n\n---\n\n".join(local_parts)
+
+    parts = []
+    if local_ctx:
+        parts.append(f"Local knowledge base:\n{local_ctx}")
+    if connectivity and has_web:
+        parts.append(f"Web search results:\n{web_ctx}")
+
+    if parts:
+        combined = "\n\n===\n\n".join(parts)
+        return (
+            "You are a helpful assistant with access to a local knowledge base"
+            + (" and web search results" if connectivity and has_web else "")
+            + ". Answer the user's question using the provided context as a starting point. "
+            "You may infer connections between multiple sources, extrapolate from context "
+            "clues, and provide your best educated interpretation even when sources don't "
+            "explicitly state the answer. Clearly distinguish between what sources directly "
+            "state vs. what you are inferring. Cite your sources where applicable."
+            f"\n\n{combined}"
+        )
+    else:
+        return (
+            "You are a helpful assistant. No local sources or web results were found. "
+            "Answer the user's question to the best of your ability based on your training, "
+            "but clearly state that this is from general knowledge, not from their documents."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Public query function
+# ---------------------------------------------------------------------------
+
+def query(question: str, settings: dict | None = None) -> dict:
+    """Execute a RAG query with the given settings."""
+    s = settings or {}
+    rigidity = s.get("rigidity") or config.RIGIDITY
+    connectivity = s.get("connectivity") if s.get("connectivity") is not None else config.CONNECTIVITY
+    storage = s.get("storage") if s.get("storage") is not None else config.STORAGE
+
     collection = get_collection()
     embed_model = get_embedding_model()
 
@@ -110,27 +298,41 @@ def query(question: str) -> dict:
         logger.error(f"ChromaDB query error: {e}")
         results = {"documents": [[]], "metadatas": [[]], "distances": [[]]}
 
-    context, sources = _build_context(results)
+    strong_ctx, weak_ctx, strong_sources, weak_sources = _build_context_with_distances(results)
 
-    if context:
-        system_msg = (
-            "You are a helpful assistant with access to a curated knowledge base. "
-            "Answer the user's question using only the provided context. "
-            "Always cite your sources by referencing the filename(s). "
-            "If the context is insufficient, say so explicitly — do not invent information."
-            f"\n\nContext:\n{context}"
-        )
+    # Web search if connectivity enabled
+    web_ctx = None
+    web_sources = []
+    if connectivity:
+        web_results = search_web(question)
+        web_ctx = format_web_context(web_results)
+        web_sources = [{"source": r["url"], "filename": r["title"]} for r in web_results]
+
+    # Build system prompt based on rigidity mode
+    system_msg = _build_system_prompt(rigidity, strong_ctx, weak_ctx, web_ctx, connectivity)
+
+    # Determine which local sources to report
+    if rigidity == "strict":
+        local_sources = strong_sources
+    elif rigidity == "suggestive":
+        local_sources = strong_sources if strong_sources else weak_sources
     else:
-        system_msg = (
-            "You are a helpful assistant. The knowledge base does not contain any relevant "
-            "information about this topic. Tell the user clearly that no relevant information "
-            "was found in the knowledge base."
-        )
+        local_sources = strong_sources + weak_sources
+
+    all_sources = local_sources + web_sources
 
     messages = [
         {"role": "system", "content": system_msg},
         {"role": "user", "content": question},
     ]
-
     answer = _api_generate(messages)
-    return {"answer": answer, "sources": sources}
+
+    result = {"answer": answer, "sources": all_sources}
+
+    # Storage: write note if enabled
+    if storage:
+        note_path = _write_note(question, answer, all_sources)
+        if note_path:
+            result["stored"] = note_path
+
+    return result

@@ -1,3 +1,13 @@
+# Dev compose template — copy to docker-compose.dev.yml and customise.
+#
+# This file is checked in; docker-compose.dev.yml is gitignored so you can
+# add personal volume mounts (e.g. local knowledge bases) without polluting
+# the repo.
+#
+#   cp docker-compose.dev.template.yml docker-compose.dev.yml
+#   # add your own RAG_DIRS volume mounts on the `be` service
+#   docker compose -f docker-compose.dev.yml up --watch
+
 services:
   fe:
     image: imbios/bun-node:latest
@@ -41,6 +51,8 @@ services:
     volumes:
       - ./BE:/app
       - ./data:/data
+      # Add personal RAG source mounts here, e.g.:
+      # - ~/Documents/my-notes:/data/my-notes
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"

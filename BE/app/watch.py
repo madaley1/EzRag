@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 _observer = None
 
 
+def _should_skip(path: str) -> bool:
+    """Return True if the path should be excluded based on config."""
+    p = Path(path)
+    if config.IGNORE_DOTFILES and any(part.startswith(".") for part in p.parts):
+        return True
+    if config.IGNORE_DIRS and any(part in config.IGNORE_DIRS for part in p.parts):
+        return True
+    if config.INGEST_EXTENSIONS and p.suffix.lower().lstrip(".") not in config.INGEST_EXTENSIONS:
+        return True
+    return False
+
+
 class RagFileHandler(FileSystemEventHandler):
     def __init__(self):
         self._collection = None
@@ -36,7 +48,7 @@ class RagFileHandler(FileSystemEventHandler):
         return self._collection
 
     def on_created(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _should_skip(event.src_path):
             logger.info(f"File created: {event.src_path}")
             try:
                 ingest_file(event.src_path, self.collection)
@@ -44,7 +56,7 @@ class RagFileHandler(FileSystemEventHandler):
                 logger.error(f"Error ingesting {event.src_path}: {e}")
 
     def on_deleted(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _should_skip(event.src_path):
             logger.info(f"File deleted: {event.src_path}")
             try:
                 mark_deleted(event.src_path, self.collection)
@@ -52,7 +64,7 @@ class RagFileHandler(FileSystemEventHandler):
                 logger.error(f"Error marking deleted {event.src_path}: {e}")
 
     def on_moved(self, event):
-        if not event.is_directory:
+        if not event.is_directory and not _should_skip(event.src_path) and not _should_skip(event.dest_path):
             logger.info(f"File moved: {event.src_path} -> {event.dest_path}")
             try:
                 mark_deleted(event.src_path, self.collection)
